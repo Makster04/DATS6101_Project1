@@ -1,6 +1,6 @@
 ---
-title: "Project 1 - New House Who Dis?"
-author: "Mia Alecia Goins"
+title: "Project 1 - Housing Data Post COVID?"
+author: "Mia Alecia Goins, Mak Trnka"
 date: "`r Sys.Date()`"
 output:
   html_document:
