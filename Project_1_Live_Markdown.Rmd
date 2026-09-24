@@ -1,0 +1,72 @@
+---
+title: "Project 1 - New House Who Dis?"
+author: "Mia Alecia Goins"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: show
+    number_sections: false
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+```{r init, include=F}
+# The package "ezids" (EZ Intro to Data Science) includes some helper functions we developed for the course. 
+# Some of the frequently used functions are loadPkg(), xkabledply(), xkablesummary(), uzscale(), etc.
+# You will need to install it (once) from GitHub.
+# library(devtools)
+# devtools::install_github("physicsland/ezids")
+# Then load the package in your R session.
+library(ezids)
+```
+
+
+```{r setup, include=FALSE}
+# Some of common RMD options (and the defaults) are: 
+# include=T, eval=T, echo=T, results='hide'/'asis'/'markup',..., collapse=F, warning=T, message=T, error=T, cache=T, fig.width=6, fig.height=4, fig.dim=c(6,4) #inches, fig.align='left'/'center','right', 
+knitr::opts_chunk$set(results="markup", warning = F, message = F)
+options(scientific=T, digits = 3) 
+```
+
+# A Peak Under the Hood!
+**What does our raw unalterd data look like?**
+```{r}
+housing = read.csv("C:/Users/flami/OneDrive/Documents/DATS6101/Project 1/RDC_Inventory_Core_Metrics_Metro_History(9-18-26).csv", header =TRUE)
+
+str(housing)
+```
+Yikes! let's see if we can clean this up a bit and add out time constraint.\
+
+# Let's Get Relevant!
+**Here we will clean up the date column, reformat cbsa_title, then only select the data from June 2023 to August 2026.**
+
+```{r}
+#cbsa_title is a factor
+housing[,3] = as.factor(housing[,3])
+#time constraint
+housing = transform(housing, month_mm =as.integer(month_date_yyyymm%%100))
+housing = transform(housing, year_yyyy = as.integer(month_date_yyyymm%/%100))
+postCOVID_housing = subset(housing, ((housing$month_mm > 5 & year_yyyy==2023)  | (housing$year_yyyy > 2023)))
+
+```
+
+Our data has gone from over 100,000 observations to a little over 36,000 after the time constraint of Post COVID (June 2023 - August 2026).\
+
+# Basic Stats
+**Exploring a little bit about our data**
+```{r}
+xkablesummary(postCOVID_housing)
+```
+
+# What's SMART About the Data?
+**Some explorations of our SMART Questions** \
+
+## Question 1
+**Does the metro area relate to the number of price increases / reductions made by a realtor? Are there more increases in more densely populated areas?** \
+
+### Null Hypothesis Construction
+
+### Hypothesis Testing
+
+### Analysis
