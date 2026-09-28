@@ -41,6 +41,9 @@ Yikes! let's see if we can clean this up a bit and add out time constraint.\
 # Let's Get Relevant!
 **Here we will clean up the date column, reformat cbsa_title, then only select the data from June 2023 to August 2026.**
 
+1. Removing all dates pre-COVID per Metro (Start from June 2023 - August 2026) 
+Number of Rows: Raw Dataset (112,850) -> Post-COVID Dataset (36,075)
+
 ```{r}
 #cbsa_title is a factor
 housing[,3] = as.factor(housing[,3])
@@ -48,10 +51,34 @@ housing[,3] = as.factor(housing[,3])
 housing = transform(housing, month_mm =as.integer(month_date_yyyymm%%100))
 housing = transform(housing, year_yyyy = as.integer(month_date_yyyymm%/%100))
 postCOVID_housing = subset(housing, ((housing$month_mm > 5 & year_yyyy==2023)  | (housing$year_yyyy > 2023)))
-
 ```
-
 Our data has gone from over 100,000 observations to a little over 36,000 after the time constraint of Post COVID (June 2023 - August 2026).\
+
+2. Removing all rows that have been flagged
+Number of Rows:  Post-COVID Dataset (36,075) -> Post-Covid Data Set without flagged rows (31,827)
+
+```{r}
+postCOVID_housing_without_QF <- postCOVID_housing %>%
+  filter(is.na(quality_flag) | quality_flag == 0))
+```
+Now our data have gone from 36,075 to a significantly lower ~9,830, after excluding not just rows that were flagged
+
+3. (OPTIONAL)Removing all metros that had flagged rows 
+Number of Rows:  Post-Covid Data Set without flagged rows (31,827) -> Post-Covid Data Set without Metros that had at least one flagged row (9,828)
+
+```{r}
+# Find every metro that has at least one flagged month
+flagged_metros <- postCOVID_housing %>%
+  filter(quality_flag == 1) %>%
+  distinct(cbsa_code)
+
+# Keep only metros that were never flagged
+postCOVID_housing_without_all_FlaggedMetros <- postCOVID_housing %>%
+  filter(!cbsa_code %in% flagged_metros$cbsa_code)
+```
+Now our data have gone from 31,827 to a an unprecdented 9,828, after excluding not just rows that were flagged, but the metros that had at least one.
+
+
 
 # Basic Stats
 **Exploring a little bit about our data**
