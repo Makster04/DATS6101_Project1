@@ -48,10 +48,11 @@ ggplot(two_tiers, aes(x = avg_days_on_market, y = price_volatility,
 ```
 
 
-Y= Price volatility: how much a metro's home prices bounce up and down from month to month. 
+Y= **Price volatility** (how much a metro's home prices bounce up and down from month to month)
 - A low number means prices stay steady.
 - A high number means prices jump around a lot.
-X= Average median days on market: about how long a typical home in a metro takes to sell, 
+
+X= **Average median days on market** (about how long a typical home in a metro takes to sell) 
 - A low number means homes sell fast.
 - A high number means homes sit on the market longer.
 <img width="915" height="998" alt="image" src="https://github.com/user-attachments/assets/108eb164-4f58-46a6-8adc-47a20e369d01" />
