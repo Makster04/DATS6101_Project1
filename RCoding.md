@@ -88,8 +88,8 @@ ggplot(plot_data, aes(x = avg_days_on_market, y = price_volatility,
 **AXES:**
 
 Y= **Price volatility** (how much a metro's home prices bounce up and down from month to month)
-- Below a 0.038 volatility, means a low number means prices stay steady.
-- Above a 0.038 volatility, means a high number means prices jump around a lot.
+- Below a 0.038 volatility, low number means prices stay steady.
+- Above a 0.038 volatility,high number means prices jump around a lot.
 
 X= **Average median days on market** (about how long a typical home in a metro takes to sell) 
 - Numbers below 60 days, means homes sell fast.
