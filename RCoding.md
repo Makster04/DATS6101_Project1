@@ -61,6 +61,4 @@ Placements on the scatter plot:
 - **Top left:** homes sell fast, but prices jump around. Buyers are active, but prices are unpredictable.
 - **Bottom right:** homes take longer to sell, but prices stay steady. A slow market where sellers aren't cutting prices.
 - **Top right:** homes take longer to sell and prices jump around. A slow, unpredictable market.
-<p align="center">
-  <img width="650" alt="Days on market vs. price volatility, largest vs. smallest metros" src="https://github.com/user-attachments/assets/68d66ba3-3ef5-49f4-bfc7-05ad02c18067" />
-</p>
+<img width="1788" height="1028" alt="image" src="https://github.com/user-attachments/assets/a0f28f40-c9fd-454a-8342-d3f7b6d850da" />
