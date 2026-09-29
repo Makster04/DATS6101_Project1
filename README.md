@@ -32,7 +32,9 @@ All four use your **Jun 2023–Aug 2026** window.
   - Pearson or Spearman correlation, after a normality check
   - or ANOVA comparing volatility across the three tiers
   - Levene's test if you're comparing spread between tiers
-- **Graphs:** a scatterplot of days on market vs. volatility with a fitted line; box plots of volatility by tier
+- **Graphs:**
+  - a scatterplot of days on market vs. volatility with a fitted line;
+  - box plots of volatility by tier
 
 ### 2. Price differences across metros
 
