@@ -85,13 +85,6 @@ ggplot(plot_data, aes(x = avg_days_on_market, y = price_volatility,
         legend.justification = "left")
 ```
 
-**What changed:**
-
-- **Step 4 builds `plot_data` with a `plot_group` column** that puts every Tier 2–8 metro into one "Tiers 2-8" group.
-- **`arrange(desc(...))` puts the grey rows first,** so they're drawn first and sit behind the blue and orange dots.
-- **`two_tiers` is still created,** so the fitted lines and your `lm()` test only use Tier 1 and Tier 9.
-- **`show.legend = FALSE` on the fitted lines** keeps the key clean: three dots (blue, orange, grey) with no extra line symbols.
-- **To make the grey lighter or darker,** change `"grey80"` to `"grey88"` or `"grey70"`.
 **AXES:**
 
 Y= **Price volatility** (how much a metro's home prices bounce up and down from month to month)
