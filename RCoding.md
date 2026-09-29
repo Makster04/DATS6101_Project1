@@ -31,20 +31,37 @@ two_tiers <- metro_dom_volatility %>%
 table(two_tiers$household_size_tier)
 ```
 
-5. The Scatterplot
+5. Set the cutoffs for each metro
+
+```{r}
+dom_cut <- median(metro_dom_volatility$avg_days_on_market)
+vol_cut <- median(metro_dom_volatility$price_volatility)
+```
+
+6. The Scatterplot
 ```{r}
 ggplot(two_tiers, aes(x = avg_days_on_market, y = price_volatility,
                       color = household_size_tier)) +
   geom_point(alpha = 0.6, size = 2) +
   geom_smooth(aes(fill = household_size_tier), method = "lm", formula = y ~ x, alpha = 0.15) +
+  geom_vline(xintercept = dom_cut, linetype = "dashed", color = "grey50") +
+  geom_hline(yintercept = vol_cut, linetype = "dashed", color = "grey50") +
+  annotate("text", x = dom_cut, y = Inf,
+           label = paste0("Fast selling: under ", round(dom_cut), " days"),
+           hjust = 1.05, vjust = 1.5, size = 3.2, color = "grey30") +
+  annotate("text", x = Inf, y = vol_cut,
+           label = paste0("High volatility: above ", round(vol_cut, 3)),
+           hjust = 1.05, vjust = -0.6, size = 3.2, color = "grey30") +
   scale_color_manual(values = c("Tier 1 (Largest)" = "#2a78d6", "Tier 9 (Smallest)" = "#eb6834")) +
   scale_fill_manual(values  = c("Tier 1 (Largest)" = "#2a78d6", "Tier 9 (Smallest)" = "#eb6834")) +
   labs(title = "Days on market vs. price volatility: largest vs. smallest metros",
-       subtitle = "Jun 2023 to Aug 2026. Each dot is one metro.",
+       subtitle = "Jun 2023 to Aug 2026. Each dot is one metro. Dashed lines = median of all metros.",
        x = "Average median days on market",
        y = "Price volatility (SD of monthly price change)",
        color = NULL, fill = NULL) +
-  theme_minimal()
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.justification = "left")
 ```
 
 
