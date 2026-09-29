@@ -1,13 +1,18 @@
-1. Start the table with each metro's average days on market
-```{r}
+Here's the full sequence in order. Steps 1–3 and 5 are unchanged. Step 4 now labels every metro instead of dropping Tiers 2–8, and Step 6 draws Tiers 2–8 as light grey dots behind Tier 1 and Tier 9.
+
+**1. Start the table with each metro's average days on market**
+
+```r
 metro_dom_volatility <- postCOVID_housing_without_QF %>%
   group_by(cbsa_code) %>%
   summarise(cbsa_title          = first(cbsa_title),
             household_size_tier = first(household_size_tier),
             avg_days_on_market  = mean(median_days_on_market, na.rm = TRUE))
 ```
-2. Add price volatility
-```{r}
+
+**2. Add price volatility**
+
+```r
 volatility <- postCOVID_housing_without_QF %>%
   group_by(cbsa_code) %>%
   summarise(price_volatility = sd(median_listing_price_mm, na.rm = TRUE))
@@ -16,34 +21,47 @@ metro_dom_volatility <- metro_dom_volatility %>%
   left_join(volatility, by = "cbsa_code")
 ```
 
-3. Drop metros missing either value
-```{r}
+**3. Drop metros missing either value**
+
+```r
 metro_dom_volatility <- metro_dom_volatility %>%
   filter(!is.na(avg_days_on_market), !is.na(price_volatility))
 ```
 
-4. Keep only two tiers (Largest & Smallest)
-```{r}
-two_tiers <- metro_dom_volatility %>%
-  filter(household_size_tier %in% c("Tier 1 (Largest)", "Tier 9 (Smallest)")) %>%
+**4. Label the plot groups (Tier 1, Tier 9, and Tiers 2–8)**
+
+```r
+plot_data <- metro_dom_volatility %>%
+  mutate(plot_group = case_when(
+           household_size_tier == "Tier 1 (Largest)"  ~ "Tier 1 (Largest)",
+           household_size_tier == "Tier 9 (Smallest)" ~ "Tier 9 (Smallest)",
+           TRUE                                        ~ "Tiers 2-8"),
+         plot_group = factor(plot_group,
+                             levels = c("Tier 1 (Largest)", "Tier 9 (Smallest)", "Tiers 2-8"))) %>%
+  arrange(desc(plot_group == "Tiers 2-8"))
+
+two_tiers <- plot_data %>%
+  filter(plot_group != "Tiers 2-8") %>%
   droplevels()
 
-table(two_tiers$household_size_tier)
+table(plot_data$plot_group)
 ```
 
-5. Set the cutoffs for each metro
+**5. Set the cutoffs from all metros**
 
-```{r}
+```r
 dom_cut <- median(metro_dom_volatility$avg_days_on_market)
 vol_cut <- median(metro_dom_volatility$price_volatility)
 ```
 
-6. The Scatterplot
-```{r}
-ggplot(two_tiers, aes(x = avg_days_on_market, y = price_volatility,
-                      color = household_size_tier)) +
-  geom_point(alpha = 0.6, size = 2) +
-  geom_smooth(aes(fill = household_size_tier), method = "lm", formula = y ~ x, alpha = 0.15) +
+**6. The scatterplot**
+
+```r
+ggplot(plot_data, aes(x = avg_days_on_market, y = price_volatility,
+                      color = plot_group)) +
+  geom_point(alpha = 0.7, size = 2) +
+  geom_smooth(data = two_tiers, aes(fill = plot_group),
+              method = "lm", formula = y ~ x, alpha = 0.15, show.legend = FALSE) +
   geom_vline(xintercept = dom_cut, linetype = "dashed", color = "grey50") +
   geom_hline(yintercept = vol_cut, linetype = "dashed", color = "grey50") +
   annotate("text", x = dom_cut, y = Inf,
@@ -52,18 +70,28 @@ ggplot(two_tiers, aes(x = avg_days_on_market, y = price_volatility,
   annotate("text", x = Inf, y = vol_cut,
            label = paste0("High volatility: above ", round(vol_cut, 3)),
            hjust = 1.05, vjust = -0.6, size = 3.2, color = "grey30") +
-  scale_color_manual(values = c("Tier 1 (Largest)" = "#2a78d6", "Tier 9 (Smallest)" = "#eb6834")) +
-  scale_fill_manual(values  = c("Tier 1 (Largest)" = "#2a78d6", "Tier 9 (Smallest)" = "#eb6834")) +
+  scale_color_manual(values = c("Tier 1 (Largest)"  = "#2a78d6",
+                                "Tier 9 (Smallest)" = "#eb6834",
+                                "Tiers 2-8"         = "grey80")) +
+  scale_fill_manual(values = c("Tier 1 (Largest)"  = "#2a78d6",
+                               "Tier 9 (Smallest)" = "#eb6834")) +
   labs(title = "Days on market vs. price volatility: largest vs. smallest metros",
        subtitle = "Jun 2023 to Aug 2026. Each dot is one metro. Dashed lines = median of all metros.",
        x = "Average median days on market",
        y = "Price volatility (SD of monthly price change)",
-       color = NULL, fill = NULL) +
+       color = NULL) +
   theme_minimal() +
   theme(legend.position = "top",
         legend.justification = "left")
 ```
 
+**What changed:**
+
+- **Step 4 builds `plot_data` with a `plot_group` column** that puts every Tier 2–8 metro into one "Tiers 2-8" group.
+- **`arrange(desc(...))` puts the grey rows first,** so they're drawn first and sit behind the blue and orange dots.
+- **`two_tiers` is still created,** so the fitted lines and your `lm()` test only use Tier 1 and Tier 9.
+- **`show.legend = FALSE` on the fitted lines** keeps the key clean: three dots (blue, orange, grey) with no extra line symbols.
+- **To make the grey lighter or darker,** change `"grey80"` to `"grey88"` or `"grey70"`.
 **AXES:**
 
 Y= **Price volatility** (how much a metro's home prices bounce up and down from month to month)
