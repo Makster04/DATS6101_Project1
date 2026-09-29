@@ -79,5 +79,6 @@ X= **Average median days on market** (about how long a typical home in a metro t
 - **Top left:** homes sell fast, but prices jump around. Buyers are active, but prices are unpredictable.
 - **Bottom right:** homes take longer to sell, but prices stay steady. A slow market where sellers aren't cutting prices.
 - **Top right:** homes take longer to sell and prices jump around. A slow, unpredictable market.
-<img width="1793" height="1042" alt="image" src="https://github.com/user-attachments/assets/682c4daa-43e7-43e9-a7c7-f2121d88a81a" />
+
+<img width="1821" height="1042" alt="image" src="https://github.com/user-attachments/assets/8564b399-1bba-43d0-8bdc-e093eb79b0cf" />
 
