@@ -55,4 +55,10 @@ Y= **Price volatility** (how much a metro's home prices bounce up and down from 
 X= **Average median days on market** (about how long a typical home in a metro takes to sell) 
 - A low number means homes sell fast.
 - A high number means homes sit on the market longer.
-<img width="915" height="998" alt="image" src="https://github.com/user-attachments/assets/108eb164-4f58-46a6-8adc-47a20e369d01" />
+
+Placements on the scatter plot:
+- **Bottom left:** homes sell fast and prices stay steady. A healthy, busy market.
+- **Top left:** homes sell fast, but prices jump around. Buyers are active, but prices are unpredictable.
+- **Bottom right:** homes take longer to sell, but prices stay steady. A slow market where sellers aren't cutting prices.
+- **Top right:** homes take longer to sell and prices jump around. A slow, unpredictable market.
+<img width="915" height="800" alt="image" src="https://github.com/user-attachments/assets/108eb164-4f58-46a6-8adc-47a20e369d01" />
