@@ -14,11 +14,9 @@ output:
 ```{r init, include=F}
 # The package "ezids" (EZ Intro to Data Science) includes some helper functions we developed for the course. 
 # Some of the frequently used functions are loadPkg(), xkabledply(), xkablesummary(), uzscale(), etc.
-# You will need to install it (once) from GitHub.
-# library(devtools)
-# devtools::install_github("physicsland/ezids")
 # Then load the package in your R session.
 library(ezids)
+library(ggplot2)
 ```
 
 
@@ -34,63 +32,83 @@ options(scientific=T, digits = 3)
 ```{r}
 housing = read.csv("C:/Users/flami/OneDrive/Documents/DATS6101/Project 1/RDC_Inventory_Core_Metrics_Metro_History(9-18-26).csv", header =TRUE)
 
-str(housing)
+#head(housing, n=5)
 ```
 Yikes! let's see if we can clean this up a bit and add out time constraint.\
 
 # Let's Get Relevant!
 **Here we will clean up the date column, reformat cbsa_title, then only select the data from June 2023 to August 2026.**
 
-1. Removing all dates pre-COVID per Metro (Start from June 2023 - August 2026) 
-Number of Rows: Raw Dataset (112,850) -> Post-COVID Dataset (36,075)
-
 ```{r}
 #cbsa_title is a factor
 housing[,3] = as.factor(housing[,3])
-#time constraint
-housing = transform(housing, month_mm =as.integer(month_date_yyyymm%%100))
-housing = transform(housing, year_yyyy = as.integer(month_date_yyyymm%/%100))
-postCOVID_housing = subset(housing, ((housing$month_mm > 5 & year_yyyy==2023)  | (housing$year_yyyy > 2023)))
+
+# date reformat and time constraint
+housing[,1] = as.Date(paste(housing[,1],"01"),'%Y%m%d')
+postCOVID_housing = housing[housing$month_date_yyyymm > "2023-05-01",]
+
+#convert date to date and house rank is a factors
+postCOVID_housing[,4] = as.factor(postCOVID_housing[,4]) # rank
+
+#make sure its quality
+quality_housing = subset(postCOVID_housing, quality_flag==0)
+str(quality_housing)
+
 ```
-Our data has gone from over 100,000 observations to a little over 36,000 after the time constraint of Post COVID (June 2023 - August 2026).\
 
-2. Removing all rows that have been flagged
-Number of Rows:  Post-COVID Dataset (36,075) -> Post-Covid Data Set without flagged rows (31,827)
-
-```{r}
-postCOVID_housing_without_QF <- postCOVID_housing %>%
-  filter(is.na(quality_flag) | quality_flag == 0))
-```
-Now our data have gone from 36,075 to a significantly lower ~9,830, after excluding not just rows that were flagged
-
-3. (OPTIONAL)Removing all metros that had flagged rows 
-Number of Rows:  Post-Covid Data Set without flagged rows (31,827) -> Post-Covid Data Set without Metros that had at least one flagged row (9,828)
-
-```{r}
-# Find every metro that has at least one flagged month
-flagged_metros <- postCOVID_housing %>%
-  filter(quality_flag == 1) %>%
-  distinct(cbsa_code)
-
-# Keep only metros that were never flagged
-postCOVID_housing_without_all_FlaggedMetros <- postCOVID_housing %>%
-  filter(!cbsa_code %in% flagged_metros$cbsa_code)
-```
-Now our data have gone from 31,827 to a an unprecdented 9,828, after excluding not just rows that were flagged, but the metros that had at least one.
-
-
+Our data has gone from over 100,000 observations to a little over 31,000 after the time constraint of Post COVID (June 2023 - August 2026).\
 
 # Basic Stats
 **Exploring a little bit about our data**
 ```{r}
-xkablesummary(postCOVID_housing)
+xkablesummary(quality_housing)
 ```
 
 # What's SMART About the Data?
 **Some explorations of our SMART Questions** \
 
-## Question 1
-**Does the metro area relate to the number of price increases / reductions made by a realtor? Are there more increases in more densely populated areas?** \
+## Question 3
+**After COVID (from June 2023 to August 2026) did the metro area relate to the number of price increases/reductions made by a Realtor, and are there more increases the lower the house rank?** \
+
+### Plots and Graphs
+It's important to see the variation in our data before constructing our hypotheses. So let's plot the variation in price increase and reduce count
+```{r}
+#split our data up by year
+housing2023 = quality_housing[quality_housing$month_date_yyyymm >= "2023-06-01" & quality_housing$month_date_yyyymm <= "2023-12-01", ]
+housing2024 = quality_housing[quality_housing$month_date_yyyymm >= "2024-01-01" & quality_housing$month_date_yyyymm <= "2024-12-01", ]
+housing2025 = quality_housing[quality_housing$month_date_yyyymm >= "2025-01-01" & quality_housing$month_date_yyyymm <= "2025-12-01", ]
+housing2026 = quality_housing[quality_housing$month_date_yyyymm >= "2026-01-01" & quality_housing$month_date_yyyymm <= "2026-12-01", ]
+ggplot(housing2023, aes(x=month_date_yyyymm,y= price_increased_count, color=cbsa_code)) +
+  geom_point(size = 3) +
+  geom_text(aes(label = price_increased_count), 
+            position = position_nudge(x = 7, y = 3),
+            size = 3, 
+            show.legend = FALSE) +
+  
+  ggtitle("Month vs. Price Increase Count in 2023") +
+  xlab("Time (Months)") +
+  ylab("Price Increase Count") +
+  theme(legend.position = "right")
+
+```
+
+### Null Hypothesis Construction
+
+
+### Hypothesis Testing
+
+### Analysis
+
+## Question 4
+**Does the total amount of listings in a metro area fluctuate during the year? Is there an increase during important times (Ex. start of school/summer)?** \
+```{r}
+# split data by season
+#summer
+#winter
+#spring
+#fall
+
+```
 
 ### Null Hypothesis Construction
 
