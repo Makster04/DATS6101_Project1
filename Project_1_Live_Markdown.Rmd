@@ -16,7 +16,6 @@ output:
 # Some of the frequently used functions are loadPkg(), xkabledply(), xkablesummary(), uzscale(), etc.
 # Then load the package in your R session.
 library(ezids)
-library(ggplot2)
 ```
 
 
@@ -32,23 +31,38 @@ options(scientific=T, digits = 3)
 ```{r}
 housing = read.csv("C:/Users/flami/OneDrive/Documents/DATS6101/Project 1/RDC_Inventory_Core_Metrics_Metro_History(9-18-26).csv", header =TRUE)
 
-#head(housing, n=5)
+head(housing, n=5)
 ```
-Yikes! let's see if we can clean this up a bit and add out time constraint.\
+Yikes! let's see if we can clean this up a bit and add our time constraint.\
+
 
 # Let's Get Relevant!
-**Here we will clean up the date column, reformat cbsa_title, then only select the data from June 2023 to August 2026.**
+**Here we will clean up the data, then only select the data from June 2023 to August 2026, the month after the CDC's official declaration of the end of COVID.**
 
 ```{r}
+#add state column
+metro_states = strsplit(housing$cbsa_title, ", ")
+metro_states = unlist(metro_states)
+states = metro_states[seq(2,length(metro_states),2)]
+state = substring(states,1,2)
+housing$state_ss = state # it counts DC as a state so there are 51
+
 #cbsa_title is a factor
 housing[,3] = as.factor(housing[,3])
+
+# add a month and a year column
+housing$month_mm = housing[,1]%%100
+housing$year_yyyy = housing[,1]%/%100
 
 # date reformat and time constraint
 housing[,1] = as.Date(paste(housing[,1],"01"),'%Y%m%d')
 postCOVID_housing = housing[housing$month_date_yyyymm > "2023-05-01",]
 
-#convert date to date and house rank is a factors
+#house rank, state, month, and year are factors
 postCOVID_housing[,4] = as.factor(postCOVID_housing[,4]) # rank
+postCOVID_housing[,48] = as.factor(postCOVID_housing[,48]) # state
+postCOVID_housing[,49] = as.factor(postCOVID_housing[,49]) # month
+postCOVID_housing[,50] = as.factor(postCOVID_housing[,50]) # year
 
 #make sure its quality
 quality_housing = subset(postCOVID_housing, quality_flag==0)
@@ -56,62 +70,167 @@ str(quality_housing)
 
 ```
 
-Our data has gone from over 100,000 observations to a little over 31,000 after the time constraint of Post COVID (June 2023 - August 2026).\
+Our data has gone from `r nrow(housing)` observations to `r nrow(quality_housing)` after the quality flagging and time constraint being post COVID (June 2023 - August 2026).\
 
 # Basic Stats
 **Exploring a little bit about our data**
 ```{r}
+str(quality_housing)
 xkablesummary(quality_housing)
 ```
 
 # What's SMART About the Data?
-**Some explorations of our SMART Questions** \
+**Let's explore our SMART Questions!** \
 
 ## Question 3
-**After COVID (from June 2023 to August 2026) did the metro area relate to the number of price increases/reductions made by a Realtor, and are there more increases the lower the house rank?** \
+**After COVID (from June 2023 to August 2026) is the average number of price reductions/increases the same across different metro areas, across states?** \
 
-### Plots and Graphs
-It's important to see the variation in our data before constructing our hypotheses. So let's plot the variation in price increase and reduce count
+### EDA
+It's important to see the variation in our data before constructing our hypotheses. So let's plot the variation in price increase and reduce count. \
+
 ```{r}
-#split our data up by year
-housing2023 = quality_housing[quality_housing$month_date_yyyymm >= "2023-06-01" & quality_housing$month_date_yyyymm <= "2023-12-01", ]
-housing2024 = quality_housing[quality_housing$month_date_yyyymm >= "2024-01-01" & quality_housing$month_date_yyyymm <= "2024-12-01", ]
-housing2025 = quality_housing[quality_housing$month_date_yyyymm >= "2025-01-01" & quality_housing$month_date_yyyymm <= "2025-12-01", ]
-housing2026 = quality_housing[quality_housing$month_date_yyyymm >= "2026-01-01" & quality_housing$month_date_yyyymm <= "2026-12-01", ]
-ggplot(housing2023, aes(x=month_date_yyyymm,y= price_increased_count, color=cbsa_code)) +
-  geom_point(size = 3) +
-  geom_text(aes(label = price_increased_count), 
-            position = position_nudge(x = 7, y = 3),
-            size = 3, 
-            show.legend = FALSE) +
-  
-  ggtitle("Month vs. Price Increase Count in 2023") +
-  xlab("Time (Months)") +
-  ylab("Price Increase Count") +
-  theme(legend.position = "right")
+#maybe add hist
+qqnorm(quality_housing$price_increased_count, main="Q-Q plot of Price Increase Count post COVID")
+qqline(quality_housing$price_increased_count)
 
+qqnorm(quality_housing$price_reduced_count, main="Q-Q plot of Price Reduced Count post COVID")
+qqline(quality_housing$price_reduced_count)
 ```
 
-### Null Hypothesis Construction
 
 
-### Hypothesis Testing
+Both reductions and increases are right skewed so lets normalize our data then plot again.\
 
-### Analysis
+```{r}
+library(ggplot2)
+#log transform our data
+log_housing = quality_housing
+log_housing$log_inc_count = log10(log_housing$price_increased_count + 1)
+log_housing$log_red_count = log10(log_housing$price_reduced_count + 1)
+log_housing$log_list_count = log10(log_housing$total_listing_count + 1)
+
+ggplot(log_housing, aes(x = month_mm, y = log_inc_count)) + 
+  geom_boxplot() + 
+  geom_boxplot( colour="black", fill="blue", outlier.colour="red", outlier.shape=2, outlier.size=4) +
+  labs(title="Boxplot of year vs price increase count post COVID", x="year", y = "log10(price increase count + 1)") 
+
+ggplot(log_housing, aes(x = month_mm, y = log_red_count)) + 
+  geom_boxplot() + 
+  geom_boxplot( colour="black", fill="red", outlier.colour="red", outlier.shape=2, outlier.size=4) +
+  labs(title="Boxplot of year vs price reduced count post COVID", x="year", y = "log10(price reduced count + 1)") 
+
+ggplot(data=log_housing, aes(log_inc_count)) + 
+  geom_histogram(breaks=seq(0, 3.5, by = 0.15), 
+                 col="green", 
+                 fill="blue", 
+                 alpha = .7) + # opacity
+  labs(x="log10(increase_count)", y="Frequency") +
+  labs(title="Histogram of log price increase counts post COVID")
+
+ggplot(data=log_housing, aes(log_red_count)) + 
+  geom_histogram(breaks=seq(0, 4.5, by = 0.15), 
+                 col="yellow", 
+                 fill="red", 
+                 alpha = .7) + # opacity
+  labs(x="log10(reduced_count)", y="Frequency") +
+  labs(title="Histogram of log price reduced counts post COVID")
+
+qqnorm(log_housing$log_inc_count, main="Q-Q plot of log Price Increase Count post COVID")
+qqline(log_housing$log_inc_count)
+
+qqnorm(log_housing$log_red_count, main="Q-Q plot of log Price Reduced Count post COVID")
+qqline(log_housing$log_red_count)
+```
+\
+
+Our reduction histogram looks normal but the increase count even after normalizing is still skwed so we cannot conduct an ANOVA test on price increases. So our modified question is:\
+
+**After COVID (from June 2023 to August 2026) is the average number of price reductions the same across different metro areas, across states?**
+
+### Null Hypothesis Construction Household Rank
+**Null Hypothesis** $H_0: \mu_1=mu_2=...=\mu_{924}=\mu_{925}$ average log price reduction count is equal across all housing ranks\
+**Alternative Hypothesis** $H_1: \mu_1\neq\mu_2\neq...\neq\mu_{924}\neq\mu_{925}$ average log price reduction count is not equal across all housing ranks\
+**Alpha** $\alpha=0.05$
+
+### Hypothesis Testing Household Rank
+```{r}
+anovaLogRank = aov(log_red_count ~ HouseholdRank, data = log_housing)
+red_rank_pval = summary(anovaLogRank)[[1]][1,5]
+xkabledply(anovaLogRank, title = "Log Price Reduction and Household Rank ANOVA result summary")
+```
+### Analysis Household Rank
+\
+Since our P-value is `r red_rank_pval` well below our $\alpha$ (0.05) we reject our null hypothesis and have data that supports our alternative hypothesis that all average log reduction counts are not equal across all house ranks.\
+
+**Post-hoc Tukey HSD Rank** \ 
+```{r tukeyHSD}
+tukeyAoVRank = TukeyHSD(anovaLogRank)
+tukeyAoVRank
+```
+
+### Null Hypothesis Contruction State
+**Null Hypothesis** $H_0: \mu_1=mu_2=...=\mu_{50}=\mu_{51}$ average log price reduction count is equal across all states (and DC)\
+**Alternative Hypothesis** $H_1: \mu_1\neq\mu_2\neq...\neq\mu_{50}\neq\mu_{51}$ average log price reduction count is not equal across all states (including DC)\
+**Alpha** $\alpha=0.05$
+
+### Hypothesis Testing State
+```{r}
+anovaLogState = aov(log_red_count ~ state_ss, data = log_housing)
+red_state_pval = summary(anovaLogState)[[1]][1,5]
+xkabledply(anovaLogState, title = "Log Price Reduction and State ANOVA result summary")
+```
+
+### Analysis State
+\
+Since our P-value is `r red_state_pval` well below our $\alpha$ (0.05) we reject our null hypothesis and have data that supports our alternative hypothesis that all average log reduction counts are not equal across all states (including DC).\
+
+**Post-hoc Tukey HSD State** \
+```{r}
+tukeyAoVState = TukeyHSD(anovaLogState)
+tukeyAoVState
+```
+
 
 ## Question 4
-**Does the total amount of listings in a metro area fluctuate during the year? Is there an increase during important times (Ex. start of school/summer)?** \
-```{r}
-# split data by season
-#summer
-#winter
-#spring
-#fall
+**After COVID (from June 2023 to August 2026) does the average amount of total listings in a metro area fluctuate during the year? Is there an increase during important times (Ex. start of school/summer)?** \
 
+### EDA 
+Let's first look at the spread of number of total listings (quantitative). Which have been log10 normalized already.
+```{r}
+ggplot(log_housing, aes(x = month_mm, y = log_list_count)) + 
+  geom_boxplot() + 
+  geom_boxplot( colour="black", fill="purple", outlier.colour="red", outlier.shape=2, outlier.size=4) +
+  labs(title="Boxplot of Month vs Total Listing Count Post COVID", x="month", y = "log10(total listing count)") 
+
+ggplot(data=log_housing, aes(log_list_count)) + 
+  geom_histogram(breaks=seq(0, 6, by = 0.2), 
+                 col="orange", 
+                 fill="purple", 
+                 alpha = .7) + # opacity
+  labs(x="log10(total listings)", y="Frequency") +
+  labs(title="Histogram of log Total Listing Counts Post COVID")
+
+qqnorm(log_housing$log_list_count, main="Q-Q plot of log total Listing Count Post COVID")
+qqline(log_housing$log_list_count)
 ```
 
-### Null Hypothesis Construction
+### Null Hypothesis Construction Total Listings
+**Null Hypothesis** $H_0: \mu_1=mu_2=...=\mu_{11}=\mu_{12}$ average log total listing count is equal across all 12 months\
+**Alternative Hypothesis** $H_1: \mu_1\neq\mu_2\neq...\neq\mu_{11}\neq\mu_{12}$ average log total listing count is not equal across all 12 months\
+**Alpha** $\alpha=0.05$
 
-### Hypothesis Testing
+### Hypothesis Testing Total Listings
+```{r}
+anovaLogList = aov(log_list_count ~ month_mm, data = log_housing)
+log_listing_pval = summary(anovaLogList)[[1]][1,5]
+xkabledply(anovaLogList, title = "log Total Listing Count and Month ANOVA result summary")
+```
 
-### Analysis
+### Analysis Total Listings
+Since our p-value is `r log_listing_pval` well below our $\alpha$ (0.05) we reject our null hypothesis and have data that supports our alternative hypothesis that the average log total listing count is not equal across all 12 months.
+
+### Post-hoc Tukey HSD Total Listings
+```{r}
+tukeyAoVList = TukeyHSD(anovaLogList)
+tukeyAoVList
+```
