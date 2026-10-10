@@ -15,7 +15,9 @@ output:
 # The package "ezids" (EZ Intro to Data Science) includes some helper functions we developed for the course. 
 # Some of the frequently used functions are loadPkg(), xkabledply(), xkablesummary(), uzscale(), etc.
 # Then load the package in your R session.
+library(dplyr)
 library(ezids)
+library(ggplot2)
 ```
 
 
@@ -33,7 +35,7 @@ housing = read.csv("C:/Users/flami/OneDrive/Documents/DATS6101/Project 1/RDC_Inv
 
 head(housing, n=5)
 ```
-Yikes! let's see if we can clean this up a bit and add our time constraint.\
+Our data has `r nrow(housing)` observations with `r ncol(housing)` measures. 
 
 
 # Let's Get Relevant!
@@ -54,7 +56,7 @@ housing[,3] = as.factor(housing[,3])
 housing$month_mm = housing[,1]%%100
 housing$year_yyyy = housing[,1]%/%100
 
-# date reformat and time constraint
+# date reformat and time constraint 
 housing[,1] = as.Date(paste(housing[,1],"01"),'%Y%m%d')
 postCOVID_housing = housing[housing$month_date_yyyymm > "2023-05-01",]
 
@@ -79,105 +81,456 @@ str(quality_housing)
 xkablesummary(quality_housing)
 ```
 
+
+
 # What's SMART About the Data?
 **Let's explore our SMART Questions!** \
 
-## Question 3
-**After COVID (from June 2023 to August 2026) is the average number of price reductions/increases the same across different metro areas, across states?** \
+## Data Preparation for Questions 1 and 2\
+Questions 1 and 2 compare each metro's median listing price in June 2023 with its price in August 2026. We keep only those two months, place each metro in a size tier using its June 2023 household rank, and calculate one price change per metro.\
+
+```{r}
+housing_start <- quality_housing %>%
+  dplyr::filter(year_yyyy == 2023, month_mm == 06) %>%
+  dplyr::arrange(HouseholdRank, cbsa_code) %>%
+  dplyr::transmute(
+    cbsa_code,
+    cbsa_title,
+    HouseholdRank,
+    price_2023 = median_listing_price,
+    pending_2023 = pending_ratio,
+    metro_size_group = factor(
+      dplyr::ntile(HouseholdRank, 4),
+      levels = 1:4,
+      labels = c(
+        "Tier 1 (Largest)",
+        "Tier 2 (Upper-Mid)",
+        "Tier 3 (Lower-Mid)",
+        "Tier 4 (Smallest)"
+      )
+    )
+  )
+
+housing_end <- quality_housing %>%
+  dplyr::filter(year_yyyy == 2026, month_mm == 08) %>%
+  dplyr::transmute(
+    cbsa_code,
+    price_2026 = median_listing_price,
+    pending_2026 = pending_ratio
+  )
+
+# One row per metro with both endpoints.
+metro_endpoints <- housing_start %>%
+  dplyr::inner_join(housing_end, by = "cbsa_code") %>%
+  dplyr::filter(
+    is.finite(price_2023),
+    is.finite(price_2026),
+    price_2023 > 0,
+    price_2026 > 0
+  ) %>%
+  dplyr::mutate(
+    price_change_pct = 100 * (price_2026 - price_2023) / price_2023,
+    log_price_change = log(price_2026 / price_2023)
+  )
+
+nrow(metro_endpoints)
+```
+## Question 1
+**After COVID (from June 2023 to August 2026), did the average change in median listing price differ across the four metro-size tiers?** \
 
 ### EDA
-It's important to see the variation in our data before constructing our hypotheses. So let's plot the variation in price increase and reduce count. \
-
+It's important to see the variation in our data before constructing our hypotheses. So let's first plot the percent change in median listing price across all metros.\
 ```{r}
-#maybe add hist
-qqnorm(quality_housing$price_increased_count, main="Q-Q plot of Price Increase Count post COVID")
-qqline(quality_housing$price_increased_count)
+q1 <- subset(
+  metro_endpoints,
+  is.finite(log_price_change) &
+  !is.na(metro_size_group)
+)
 
-qqnorm(quality_housing$price_reduced_count, main="Q-Q plot of Price Reduced Count post COVID")
-qqline(quality_housing$price_reduced_count)
+stopifnot(anyDuplicated(q1$cbsa_code) == 0)
+
+table(q1$metro_size_group)
+
+q1_colors <- c("blue", "lightblue", "gold", "orange")
+
+ggplot(data = q1, aes(price_change_pct)) +
+  geom_histogram(bins = 30,
+                 col = "black",
+                 fill = "blue",
+                 alpha = .7) + # opacity
+  labs(x = "% change in median listing price", y = "Frequency") +
+  labs(title = "Histogram of % listing-price change post COVID")
+
+qqnorm(q1$price_change_pct, main = "Q-Q plot of % Listing-Price Change post COVID")
+qqline(q1$price_change_pct)
 ```
 
-
-
-Both reductions and increases are right skewed so lets normalize our data then plot again.\
+A percent change can't fall below -100% but has no upper limit, so percent changes tend to be right skewed. So let's log transform our data, using $\log(\text{price}_{2026} / \text{price}_{2023})$, then plot again. For small changes the log change is close to the percent change (a log change of 0.10 is about 10.5%).\
 
 ```{r}
-library(ggplot2)
-#log transform our data
-log_housing = quality_housing
-log_housing$log_inc_count = log10(log_housing$price_increased_count + 1)
-log_housing$log_red_count = log10(log_housing$price_reduced_count + 1)
-log_housing$log_list_count = log10(log_housing$total_listing_count + 1)
+ggplot(data = q1, aes(log_price_change)) +
+  geom_histogram(bins = 30,
+                 col = "black",
+                 fill = "blue",
+                 alpha = .7) + # opacity
+  labs(x = "log(price 2026 / price 2023)", y = "Frequency") +
+  labs(title = "Histogram of log listing-price change post COVID")
 
-ggplot(log_housing, aes(x = month_mm, y = log_inc_count)) + 
-  geom_boxplot() + 
-  geom_boxplot( colour="black", fill="blue", outlier.colour="red", outlier.shape=2, outlier.size=4) +
-  labs(title="Boxplot of year vs price increase count post COVID", x="year", y = "log10(price increase count + 1)") 
+ggplot(q1, aes(x = metro_size_group, y = log_price_change, fill = metro_size_group)) +
+  geom_boxplot(colour = "black", outlier.colour = "red", outlier.shape = 2, outlier.size = 2) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 4, colour = "black") +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
+  scale_fill_manual(values = q1_colors) +
+  labs(title = "Boxplot of metro-size tier vs log listing-price change post COVID",
+       x = "Metro-size tier", y = "log(price 2026 / price 2023)") +
+  theme(legend.position = "none")
 
-ggplot(log_housing, aes(x = month_mm, y = log_red_count)) + 
-  geom_boxplot() + 
-  geom_boxplot( colour="black", fill="red", outlier.colour="red", outlier.shape=2, outlier.size=4) +
-  labs(title="Boxplot of year vs price reduced count post COVID", x="year", y = "log10(price reduced count + 1)") 
+q1_qq_plot <- ggplot(q1, aes(sample = log_price_change, color = metro_size_group)) +
+  stat_qq(size = 1.5, alpha = 0.7) +
+  stat_qq_line(color = "black") +
+  facet_wrap(~ metro_size_group, ncol = 2, scales = "free_y") +
+  scale_color_manual(values = q1_colors) +
+  labs(title = "Q-Q plots of log listing-price change by tier post COVID",
+       x = "Theoretical normal quantiles",
+       y = "Log price-change quantiles") +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "none")
 
-ggplot(data=log_housing, aes(log_inc_count)) + 
-  geom_histogram(breaks=seq(0, 3.5, by = 0.15), 
+q1_qq_plot
+
+q1_summary <- q1 %>%
+  dplyr::group_by(metro_size_group) %>%
+  dplyr::summarise(
+    n = dplyr::n(),
+    mean_log_change = mean(log_price_change),
+    median_log_change = median(log_price_change),
+    sd_log_change = sd(log_price_change),
+    avg_pct_change = 100 * (exp(mean(log_price_change)) - 1)
+  )
+
+xkabledply(as.data.frame(q1_summary), title = "Log listing-price change by metro-size tier")
+```
+
+In the boxplot, black diamonds show the mean of each tier and the lines inside the boxes show the median. The Q-Q plots show the log price changes are roughly normal in all four tiers. Tiers 2 and 3 have a longer upper tail, meaning a few metros had unusually large price gains, but with this many metros per tier the ANOVA holds up well to mild non-normality. So we can conduct an ANOVA test on log listing-price change.\
+
+### Null Hypothesis Construction Metro-Size Tier
+**Null Hypothesis** $H_0: \mu_1=\mu_2=\mu_3=\mu_4$ average log listing-price change is equal across all four metro-size tiers\
+**Alternative Hypothesis** $H_1:$ at least one tier's average log listing-price change is different\
+**Alpha** $\alpha=0.05$
+
+### Hypothesis Testing Metro-Size Tier
+```{r}
+q1_anova <- aov(log_price_change ~ metro_size_group, data = q1)
+q1_pval <- summary(q1_anova)[[1]][1, 5]
+xkabledply(q1_anova, title = "Log Listing-Price Change and Metro-Size Tier ANOVA result summary")
+
+# Mean log change per tier, converted to average % change.
+q1_means <- tapply(q1$log_price_change, q1$metro_size_group, mean)
+q1_pct <- 100 * (exp(q1_means) - 1)
+round(q1_pct, 2)
+
+# Check: Welch's ANOVA does not assume the tiers have equal spreads.
+q1_welch_pval <- oneway.test(log_price_change ~ metro_size_group, data = q1, var.equal = FALSE)$p.value
+q1_welch_pval
+```
+
+### Analysis Metro-Size Tier
+\
+Our p-value is `r format.pval(q1_pval, digits = 3, eps = 0.001)`, which is `r if (q1_pval < 0.05) "below" else "above"` our $\alpha$ (0.05), so we `r if (q1_pval < 0.05) "reject our null hypothesis and have data that supports our alternative hypothesis that average log listing-price change is not equal across all four metro-size tiers" else "fail to reject our null hypothesis. There is not enough evidence that average log listing-price change differs across the four metro-size tiers"`.\
+
+Converted to percentages, `r names(which.max(q1_pct))` had the largest average price change (`r round(max(q1_pct), 1)`%) and `r names(which.min(q1_pct))` had the smallest (`r round(min(q1_pct), 1)`%). Because the tiers have different spreads, we also ran Welch's ANOVA, which gives a p-value of `r format.pval(q1_welch_pval, digits = 3, eps = 0.001)` and `r if ((q1_welch_pval < 0.05) == (q1_pval < 0.05)) "leads to the same conclusion" else "leads to a different conclusion, so this result should be interpreted with caution"`.\
+
+**Post-hoc Tukey HSD Metro-Size Tier** \
+```{r}
+q1_tukey <- TukeyHSD(q1_anova)
+q1_tukey
+
+q1_tukey_table <- as.data.frame(q1_tukey$metro_size_group)
+q1_sig_pairs <- rownames(q1_tukey_table)[q1_tukey_table$`p adj` < 0.05]
+```
+
+Each row compares two tiers, and pairs with a `p adj` below 0.05 have significantly different average log price changes. Significantly different pairs: `r if (length(q1_sig_pairs) > 0) paste(q1_sig_pairs, collapse = "; ") else "none"`.`r if (q1_pval >= 0.05) " Because the ANOVA was not significant, these comparisons are shown for completeness only." else ""`\
+
+## Question 2
+**After COVID (from June 2023 to August 2026), were increases in pending ratios associated with changes in median listing prices across metro areas?** \
+
+**Pending Ratio:** The number of pending listings divided by the number of active listings. It measures the balance between supply (active listings) and demand (pending listings).\
+- **Increase in Pending Ratio:** The market got tighter. Demand grew relative to supply, meaning buyers faced more competition and sellers gained more leverage.\
+- **Decrease in Pending Ratio:** The market got looser. Supply grew relative to demand, meaning buyers gained more leverage and sellers faced more competition to sell.\
+
+We answer this two ways. An ANOVA compares the **size** of the average log price change between metros whose pending ratio increased and metros whose pending ratio decreased. A chi-square test compares the **direction**, meaning the share of metros whose listing price increased.\
+
+### EDA
+Let's first group each metro by the direction of its pending ratio and its listing price. A metro counts as "Increased" if its August 2026 value is higher than its June 2023 value, and "Decreased" otherwise, so "Decreased" also includes the few metros with no change.\
+
+```{r}
+q2 <- subset(
+  metro_endpoints,
+  is.finite(log_price_change) &
+  is.finite(pending_2023) &
+  is.finite(pending_2026) &
+  pending_2023 >= 0 &
+  pending_2026 >= 0
+)
+
+stopifnot(nrow(q2) > 0)
+stopifnot(anyDuplicated(q2$cbsa_code) == 0)
+
+q2$pending_change <- q2$pending_2026 - q2$pending_2023
+
+directions <- c("Increased", "Decreased")
+
+q2$pending_group <- factor(
+  ifelse(q2$pending_change > 0, "Increased", "Decreased"),
+  levels = directions
+)
+
+q2$price_group <- factor(
+  ifelse(q2$price_2026 > q2$price_2023, "Increased", "Decreased"),
+  levels = directions
+)
+
+q2_colors <- c("Increased" = "#eb6834", "Decreased" = "#2a78d6")
+
+table(q2$pending_group)
+table(q2$price_group)
+```
+
+Next, let's look at the spread of log listing-price change in each pending-ratio group.\
+
+```{r}
+ggplot(q2, aes(x = pending_group, y = log_price_change, fill = pending_group)) +
+  geom_boxplot(colour = "black", outlier.colour = "red", outlier.shape = 2, outlier.size = 2) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 4, colour = "black") +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
+  scale_fill_manual(values = q2_colors) +
+  labs(title = "Boxplot of pending-ratio direction vs log listing-price change post COVID",
+       x = "Change in pending ratio", y = "log(price 2026 / price 2023)") +
+  theme(legend.position = "none")
+
+q2_qq_plot <- ggplot(q2, aes(sample = log_price_change, color = pending_group)) +
+  stat_qq(size = 1.5, alpha = 0.7) +
+  stat_qq_line(color = "black") +
+  facet_wrap(~ pending_group, ncol = 2, scales = "free_y") +
+  scale_color_manual(values = q2_colors) +
+  labs(title = "Q-Q plots of log listing-price change by pending-ratio direction",
+       x = "Theoretical normal quantiles",
+       y = "Log price-change quantiles") +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "none")
+
+q2_qq_plot
+```
+
+Finally, let's count how many metros fall into each combination of pending-ratio direction and listing-price direction, and show each group's split as a 100% stacked bar.\
+
+```{r}
+q2_table <- table(
+  q2$pending_group,
+  q2$price_group,
+  dnn = c("Pending ratio", "Listing price")
+)
+
+addmargins(q2_table)
+
+q2_prop <- 100 * prop.table(q2_table, margin = 1)
+
+q2_bar <- as.data.frame(q2_prop)
+names(q2_bar) <- c("pending_group", "price_group", "percent")
+q2_bar$label <- ifelse(q2_bar$percent > 0, paste0(round(q2_bar$percent, 1), "%"), "")
+
+q2_axis_labels <- paste0(directions, "\nn = ", rowSums(q2_table))
+
+q2_plot <- ggplot(q2_bar, aes(pending_group, percent, fill = price_group)) +
+  geom_bar(stat = "identity", width = 0.6) +
+  geom_text(aes(label = label), position = position_stack(vjust = 0.5)) +
+  scale_fill_manual(values = q2_colors, name = "Median listing-price change") +
+  scale_x_discrete(labels = q2_axis_labels) +
+  scale_y_continuous(breaks = seq(0, 100, 20), labels = paste0(seq(0, 100, 20), "%")) +
+  labs(title = "Listing-price direction by pending-ratio direction post COVID",
+       x = "Change in pending ratio",
+       y = "Percentage of metros",
+       caption = "'Decreased' includes unchanged values.") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+q2_plot
+```
+
+### Null Hypothesis Construction Pending-Ratio Direction (ANOVA)
+**Null Hypothesis** $H_0: \mu_{increased}=\mu_{decreased}$ average log listing-price change is equal for metros whose pending ratio increased and metros whose pending ratio decreased\
+**Alternative Hypothesis** $H_1: \mu_{increased}\neq\mu_{decreased}$ average log listing-price change is different between the two groups\
+**Alpha** $\alpha=0.05$
+
+### Hypothesis Testing Pending-Ratio Direction (ANOVA)
+```{r}
+q2_anova <- aov(log_price_change ~ pending_group, data = q2)
+q2_pval <- summary(q2_anova)[[1]][1, 5]
+xkabledply(q2_anova, title = "Log Listing-Price Change and Pending-Ratio Direction ANOVA result summary")
+
+# Mean log change per group, converted to average % change.
+q2_means <- tapply(q2$log_price_change, q2$pending_group, mean)
+q2_pct <- 100 * (exp(q2_means) - 1)
+round(q2_pct, 2)
+
+# Check: Welch's ANOVA does not assume the groups have equal spreads.
+q2_welch_pval <- oneway.test(log_price_change ~ pending_group, data = q2, var.equal = FALSE)$p.value
+q2_welch_pval
+```
+
+### Analysis Pending-Ratio Direction (ANOVA)
+\
+Our p-value is `r format.pval(q2_pval, digits = 3, eps = 0.001)`, which is `r if (q2_pval < 0.05) "below" else "above"` our $\alpha$ (0.05), so we `r if (q2_pval < 0.05) "reject our null hypothesis and have data that supports our alternative hypothesis that average log listing-price change is different between metros whose pending ratio increased and metros whose pending ratio decreased" else "fail to reject our null hypothesis. There is not enough evidence that average log listing-price change differs between the two pending-ratio groups"`.\
+
+Converted to percentages, metros whose pending ratio increased had an average price change of `r round(q2_pct["Increased"], 1)`%, compared with `r round(q2_pct["Decreased"], 1)`% for metros whose pending ratio decreased. Welch's ANOVA gives a p-value of `r format.pval(q2_welch_pval, digits = 3, eps = 0.001)` and `r if ((q2_welch_pval < 0.05) == (q2_pval < 0.05)) "leads to the same conclusion" else "leads to a different conclusion, so this result should be interpreted with caution"`. With only two groups, no post-hoc Tukey test is needed.\
+
+### Null Hypothesis Construction Pending-Ratio Direction (Chi-square)
+**Null Hypothesis** $H_0:$ pending-ratio direction and listing-price direction are independent\
+**Alternative Hypothesis** $H_1:$ pending-ratio direction and listing-price direction are associated\
+**Alpha** $\alpha=0.05$
+
+### Hypothesis Testing Pending-Ratio Direction (Chi-square)
+```{r}
+# Expected counts if the two directions were independent.
+q2_expected <- outer(rowSums(q2_table), colSums(q2_table)) / sum(q2_table)
+dimnames(q2_expected) <- dimnames(q2_table)
+round(q2_expected, 2)
+
+# Classroom rule: every expected count must be at least 5.
+stopifnot(all(q2_expected >= 5))
+
+q2_chi <- chisq.test(q2_table, correct = FALSE)
+q2_chi_pval <- q2_chi$p.value
+q2_chi
+```
+
+### Analysis Pending-Ratio Direction (Chi-square)
+\
+All expected counts are at least 5, so the chi-square test is valid. Our p-value is `r format.pval(q2_chi_pval, digits = 3, eps = 0.001)`, which is `r if (q2_chi_pval < 0.05) "below" else "above"` our $\alpha$ (0.05), so we `r if (q2_chi_pval < 0.05) "reject our null hypothesis and have data that supports our alternative hypothesis that pending-ratio direction and listing-price direction are associated" else "fail to reject our null hypothesis. There is not enough evidence that pending-ratio direction and listing-price direction are associated"`.\
+
+`r round(q2_prop["Increased", "Increased"], 1)`% of metros whose pending ratio increased saw their median listing price rise, compared with `r round(q2_prop["Decreased", "Increased"], 1)`% of metros whose pending ratio decreased.\
+
+Both tests assume each metro is an independent observation, and they show association, not cause and effect.\
+
+## Question 3a
+**After COVID (from June 2023 to August 2026) is the average number of price reduction/increase share the same across different areas, across states?** \
+**price_increased_share:** The percent of houses that had price increases in that metro area\
+**price_reduced_share:** The percent of houses that had price reductions in that metro area\
+
+### EDA
+It's important to see the variation in our data before constructing our hypotheses. So let's plot the variation in price increase and reduce share. \
+
+```{r}
+ggplot(data=quality_housing, aes(price_increased_share)) + 
+  geom_histogram(breaks=seq(0, 0.1, by = 0.002), 
                  col="green", 
                  fill="blue", 
                  alpha = .7) + # opacity
-  labs(x="log10(increase_count)", y="Frequency") +
-  labs(title="Histogram of log price increase counts post COVID")
+  labs(x="Price Increase Share", y="Frequency") +
+  labs(title="Histogram of Price Increase Share Post COVID")
 
-ggplot(data=log_housing, aes(log_red_count)) + 
-  geom_histogram(breaks=seq(0, 4.5, by = 0.15), 
+ggplot(data=quality_housing, aes(price_reduced_share)) + 
+  geom_histogram(breaks=seq(0, 0.4, by = 0.02), 
                  col="yellow", 
                  fill="red", 
                  alpha = .7) + # opacity
-  labs(x="log10(reduced_count)", y="Frequency") +
-  labs(title="Histogram of log price reduced counts post COVID")
+  labs(x="Price Reduced Share", y="Frequency") +
+  labs(title="Histogram of Price Reduced Share Post COVID")
 
-qqnorm(log_housing$log_inc_count, main="Q-Q plot of log Price Increase Count post COVID")
-qqline(log_housing$log_inc_count)
+qqnorm(quality_housing$price_increased_share, main="Q-Q plot of Price Increase Share post COVID")
+qqline(quality_housing$price_increased_share)
 
-qqnorm(log_housing$log_red_count, main="Q-Q plot of log Price Reduced Count post COVID")
-qqline(log_housing$log_red_count)
+qqnorm(quality_housing$price_reduced_share, main="Q-Q plot of Price Reduced Share post COVID")
+qqline(quality_housing$price_reduced_share)
+```
+
+
+
+Reductions looks good but price increase shares is right skewed so lets normalize our data then plot again.\
+
+```{r}
+#log transform our data
+log_housing = quality_housing
+log_housing$log_inc_share = log10(log_housing$price_increased_share + 1)
+
+
+ggplot(log_housing, aes(x = month_mm, y = log_inc_share)) + 
+  geom_boxplot() + 
+  geom_boxplot( colour="black", fill="blue", outlier.colour="red", outlier.shape=2, outlier.size=4) +
+  labs(title="Boxplot of year vs log price increase share post COVID", x="year", y = "log10(price increase share + 1)") 
+
+ggplot(log_housing, aes(x = month_mm, y = price_reduced_share)) + 
+  geom_boxplot() + 
+  geom_boxplot( colour="black", fill="red", outlier.colour="red", outlier.shape=2, outlier.size=4) +
+  labs(title="Boxplot of year vs price reduced share post COVID", x="year", y = "price reduced share") 
+
+ggplot(data=log_housing, aes(log_inc_share)) + 
+  geom_histogram(breaks=seq(0, 0.1, by = 0.002), 
+                 col="green", 
+                 fill="blue", 
+                 alpha = .7) + # opacity
+  labs(x="log10(increase_share)", y="Frequency") +
+  labs(title="Histogram of log price increase share post COVID")
+
+ggplot(data=log_housing, aes(price_reduced_share)) + 
+  geom_histogram(breaks=seq(0, 0.4, by = 0.02), 
+                 col="yellow", 
+                 fill="red", 
+                 alpha = .7) + # opacity
+  labs(x="price reduced share", y="Frequency") +
+  labs(title="Histogram of price reduced share post COVID")
+
+qqnorm(log_housing$log_inc_share, main="Q-Q plot of log Price Increase Share post COVID")
+qqline(log_housing$log_inc_share)
+
+qqnorm(log_housing$price_reduced_share, main="Q-Q plot of Price Reduced Share post COVID")
+qqline(log_housing$price_reduced_share)
 ```
 \
 
-Our reduction histogram looks normal but the increase count even after normalizing is still skwed so we cannot conduct an ANOVA test on price increases. So our modified question is:\
+Our reduction histogram looks normal but the increase share even after normalizing is still skewed due to the large amount of 0s so we cannot conduct an ANOVA test on price increases. So let's modify our question:\
 
-**After COVID (from June 2023 to August 2026) is the average number of price reductions the same across different metro areas, across states?**
+**After COVID (from June 2023 to August 2026) is the average number of price reductions the same across different metro areas, across states?**\
+**price_reduced_share:** The percent of houses that had price reductions in that metro area\
 
 ### Null Hypothesis Construction Household Rank
-**Null Hypothesis** $H_0: \mu_1=mu_2=...=\mu_{924}=\mu_{925}$ average log price reduction count is equal across all housing ranks\
-**Alternative Hypothesis** $H_1: \mu_1\neq\mu_2\neq...\neq\mu_{924}\neq\mu_{925}$ average log price reduction count is not equal across all housing ranks\
+**Null Hypothesis** $H_0: \mu_1=mu_2=...=\mu_{924}=\mu_{925}$ average price reduction share is equal across all household ranks\
+**Alternative Hypothesis** $H_1: \mu_1\neq\mu_2\neq...\neq\mu_{924}\neq\mu_{925}$ average price reduction share is not equal across all household ranks\
 **Alpha** $\alpha=0.05$
 
 ### Hypothesis Testing Household Rank
 ```{r}
-anovaLogRank = aov(log_red_count ~ HouseholdRank, data = log_housing)
-red_rank_pval = summary(anovaLogRank)[[1]][1,5]
-xkabledply(anovaLogRank, title = "Log Price Reduction and Household Rank ANOVA result summary")
+anovaRank = aov(price_reduced_share ~ HouseholdRank, data = log_housing)
+red_rank_pval = summary(anovaRank)[[1]][1,5]
+xkabledply(anovaRank, title = "Price Reduction Share and Household Rank ANOVA result summary")
 ```
 ### Analysis Household Rank
 \
-Since our P-value is `r red_rank_pval` well below our $\alpha$ (0.05) we reject our null hypothesis and have data that supports our alternative hypothesis that all average log reduction counts are not equal across all house ranks.\
+Since our P-value is `r red_rank_pval` well below our $\alpha$ (0.05) we reject our null hypothesis and have data that supports our alternative hypothesis that all average reduction share are not equal across all house ranks.\
 
 **Post-hoc Tukey HSD Rank** \ 
 ```{r tukeyHSD}
-tukeyAoVRank = TukeyHSD(anovaLogRank)
+tukeyAoVRank = TukeyHSD(anovaRank)
 tukeyAoVRank
 ```
 
+```{r}
+tukeyRankdf = data.frame(tukeyAoVRank$HouseholdRank)
+problem_rank_pairs = subset(tukeyRankdf, p.adj<0.05)  # failed
+passed_rank_pairs = subset(tukeyRankdf, p.adj>=0.05)  # passed  
+```
+Of all the `r nrow(tukeyRankdf)` rows in the Tukey test `r nrow(problem_rank_pairs)` failed or `r (nrow(problem_rank_pairs)/nrow(tukeyRankdf))*100` percent of the pairs failed. While `r (nrow(passed_rank_pairs)/nrow(tukeyRankdf))*100` percent passed.
+
 ### Null Hypothesis Contruction State
-**Null Hypothesis** $H_0: \mu_1=mu_2=...=\mu_{50}=\mu_{51}$ average log price reduction count is equal across all states (and DC)\
-**Alternative Hypothesis** $H_1: \mu_1\neq\mu_2\neq...\neq\mu_{50}\neq\mu_{51}$ average log price reduction count is not equal across all states (including DC)\
+**Null Hypothesis** $H_0: \mu_1=mu_2=...=\mu_{50}=\mu_{51}$ average price reduction share is equal across all states (and DC)\
+**Alternative Hypothesis** $H_1: \mu_1\neq\mu_2\neq...\neq\mu_{50}\neq\mu_{51}$ average price reduction share is not equal across all states (including DC)\
 **Alpha** $\alpha=0.05$
 
 ### Hypothesis Testing State
 ```{r}
-anovaLogState = aov(log_red_count ~ state_ss, data = log_housing)
-red_state_pval = summary(anovaLogState)[[1]][1,5]
-xkabledply(anovaLogState, title = "Log Price Reduction and State ANOVA result summary")
+anovaState = aov(price_reduced_share ~ state_ss, data = log_housing)
+red_state_pval = summary(anovaState)[[1]][1,5]
+xkabledply(anovaState, title = "Price Reduction Share and State ANOVA result summary")
 ```
 
 ### Analysis State
@@ -186,31 +539,121 @@ Since our P-value is `r red_state_pval` well below our $\alpha$ (0.05) we reject
 
 **Post-hoc Tukey HSD State** \
 ```{r}
-tukeyAoVState = TukeyHSD(anovaLogState)
+tukeyAoVState = TukeyHSD(anovaState)
 tukeyAoVState
 ```
 
+```{r}
+tukeyStatedf = data.frame(tukeyAoVState$state_ss)
+problem_state_pairs = subset(tukeyStatedf, p.adj<0.05)  # failed
+passed_state_pairs = subset(tukeyStatedf, p.adj>=0.05)  # passed  
+```
+Of all the `r nrow(tukeyStatedf)` rows in the Tukey test `r nrow(problem_state_pairs)` failed or `r (nrow(problem_state_pairs)/nrow(tukeyStatedf))*100` percent of the pairs failed. While `r (nrow(passed_state_pairs)/nrow(tukeyStatedf))*100` percent passed.
+
+## Question 3b
+**After COVID (from June 2023 to August 2026) is the ratio of price increase shares to no price increase shares the same across different metro areas, across states?**\
+**price_increases:** a boolean wich answers if that metro has had any price increases\
+
+### Null Hypothesis Construction Household Rank
+**Null Hypothesis** $H_0:$ price increases and metro area are independent\
+**Alternative Hypothesis** $H_1:$ price increases and metro area are NOT independent\
+**Alpha** $\alpha=0.05$
+
+Let's add another column where it identifies which metro had price increases as 1 and 0 if there weren't any\
+```{r}
+quality_housing$price_increases = ifelse(quality_housing$price_increased_share == 0, 0, 1)
+quality_housing[,51] = as.factor(quality_housing[,51]) 
+```
+
+Now let's create the two contingency tables on price_increases vs HouseholdRank and price_increases vs state_ss\
+```{r}
+contableRank = table(quality_housing$price_increases, quality_housing$HouseholdRank)
+xkabledply(contableRank, title="Contingency table for price_increases vs HouseholdRank")
+```
+
+### $\chi^2$ Test Rank\
+```{r}
+chitestRank = chisq.test(contableRank)
+chitestRank
+```
+
+### Analysis Rank\
+Since <2e-16 is less than our $\alpha$ we reject our null hypothesis and have data that supports our alternative hypothesis that price increases and metro area are NOT independent \
+
+```{r, fig.width=90}
+#housing =quality_housing[year_yyyy=="2025"]
+ggplot(subset(quality_housing, year_yyyy==2025), aes(fill=price_increases, y=price_increases, x=HouseholdRank)) + 
+    geom_bar(position="stack", stat="identity") +
+    geom_col(width = 0.5) +
+    labs(title="Ratio of HouseholdRank with Price Increases Vs Didn't")
+```
+Though hard to see there is a general trend that the higher the HouseholdRank the more increases.\
+
+### Null Hypothesis Construction Household State
+**Null Hypothesis** $H_0:$ price increases and metro area are independent\
+**Alternative Hypothesis** $H_1:$ price increases and metro area are NOT independent\
+**Alpha** $\alpha=0.05$
+```{r}
+contableState = table(quality_housing$price_increases, quality_housing$state_ss)
+xkabledply(contableState, title="Contingency table for price_increases vs state_ss")
+```
+
+
+### $\chi^2$ Test State \
+```{r}
+chitestState = chisq.test(contableState)
+chitestState
+```
+
+### Analysis State \ 
+Since <2e-16 is less than our $\alpha$ we reject our null hypothesis and have data that supports our alternative hypothesis that price increases and state are NOT independent \
+
+```{r, fig.width=15}
+ggplot(quality_housing, aes(fill=price_increases, y=price_increases, x=state_ss)) + 
+    geom_bar(position="stack", stat="identity") +
+    geom_col(width = 0.5) +
+    labs(title="Ratio of States with Price Increases Vs Didn't")
+```
 
 ## Question 4
 **After COVID (from June 2023 to August 2026) does the average amount of total listings in a metro area fluctuate during the year? Is there an increase during important times (Ex. start of school/summer)?** \
+**total_listing_count:** the total amount of listings in that metro area per month\
 
 ### EDA 
-Let's first look at the spread of number of total listings (quantitative). Which have been log10 normalized already.
+Let's first look at the spread of number of total listings (quantitative).
 ```{r}
+ggplot(data=quality_housing, aes(total_listing_count)) + 
+  geom_histogram(breaks=seq(0, 63000, by = 1200), 
+                 col="orange", 
+                 fill="purple", 
+                 alpha = .7) + # opacity
+  labs(x="Total Listing Count", y="Frequency") +
+  labs(title="Histogram of Total Listing Counts Post COVID")
+
+
+qqnorm(quality_housing$total_listing_count, main="Q-Q plot of Total Listing Count Post COVID")
+qqline(quality_housing$total_listing_count)
+```
+Skewed once again lets normalize and re-plot.
+
+```{r}
+# log transform the data
+log_housing$log_list_count = log10(log_housing$total_listing_count + 1)
+
 ggplot(log_housing, aes(x = month_mm, y = log_list_count)) + 
   geom_boxplot() + 
   geom_boxplot( colour="black", fill="purple", outlier.colour="red", outlier.shape=2, outlier.size=4) +
-  labs(title="Boxplot of Month vs Total Listing Count Post COVID", x="month", y = "log10(total listing count)") 
+  labs(title="Boxplot of Month vs Total Listing Count Post COVID", x="month", y = "log10(Total Listing Count)") 
 
 ggplot(data=log_housing, aes(log_list_count)) + 
   geom_histogram(breaks=seq(0, 6, by = 0.2), 
                  col="orange", 
                  fill="purple", 
                  alpha = .7) + # opacity
-  labs(x="log10(total listings)", y="Frequency") +
-  labs(title="Histogram of log Total Listing Counts Post COVID")
+  labs(x="log10(Total Listing Count)", y="Frequency") +
+  labs(title="Histogram of log Total Listing Count Post COVID")
 
-qqnorm(log_housing$log_list_count, main="Q-Q plot of log total Listing Count Post COVID")
+qqnorm(log_housing$log_list_count, main="Q-Q plot of log Total Listing Count Post COVID")
 qqline(log_housing$log_list_count)
 ```
 
@@ -224,6 +667,7 @@ qqline(log_housing$log_list_count)
 anovaLogList = aov(log_list_count ~ month_mm, data = log_housing)
 log_listing_pval = summary(anovaLogList)[[1]][1,5]
 xkabledply(anovaLogList, title = "log Total Listing Count and Month ANOVA result summary")
+print(log_listing_pval)
 ```
 
 ### Analysis Total Listings
@@ -234,3 +678,19 @@ Since our p-value is `r log_listing_pval` well below our $\alpha$ (0.05) we reje
 tukeyAoVList = TukeyHSD(anovaLogList)
 tukeyAoVList
 ```
+
+```{r}
+tukeyListdf = data.frame(tukeyAoVList$month_mm)
+problem_Lits_pairs = subset(tukeyListdf, p.adj<0.05)  # failed
+passed_List_pairs = subset(tukeyListdf, p.adj>=0.05)  # passed  
+summer_pairs =  tukeyListdf[c(4,5,14,15,23,24,31,32,39,40,41,42,43,44,45,46,47,48,49,50,51),]
+school_pairs = tukeyListdf[c(7,8,17,18,26,27,34,35,41,42,47,48,52,53,57,58,59,60,61,62,63),]
+problem_Lits_pairs
+school_pairs
+summer_pairs
+``` 
+There were only `r nrow(problem_Lits_pairs)` problem pairs of the `r nrow(tukeyListdf)` total pairs  or `r (nrow(problem_Lits_pairs)/nrow(tukeyListdf))*100` percent failed and all of them were either paired with January or February. \
+
+For the start of school (August & September) there were only `r nrow(subset(school_pairs, p.adj<0.05))` or `r (nrow(subset(school_pairs, p.adj<0.05))/nrow(school_pairs))*100` percent failed and `r nrow(subset(school_pairs, p.adj>=0.05))` or `r (nrow(subset(school_pairs, p.adj>=0.05))/nrow(school_pairs))*100` percent passed.\
+
+For the start of summer (May & June) there were only `r nrow(subset(summer_pairs, p.adj<0.05))`  or `r (nrow(subset(summer_pairs, p.adj<0.05))/nrow(summer_pairs))*100` percent failed and `r nrow(subset(summer_pairs, p.adj>=0.05))`  or `r (nrow(subset(summer_pairs, p.adj>=0.05))/nrow(summer_pairs))*100` percent passed.
