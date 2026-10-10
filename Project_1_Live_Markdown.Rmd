@@ -29,8 +29,14 @@ options(scientific=T, digits = 3)
 # A Peak Under the Hood!
 **What does our raw unalterd data look like?**
 ```{r}
+# Mia's File for the same dataset
 housing = read.csv("C:/Users/flami/OneDrive/Documents/DATS6101/Project 1/RDC_Inventory_Core_Metrics_Metro_History(9-18-26).csv", header =TRUE)
+head(housing, n=5)
+```
 
+```{r}
+# Mak's File for the same dataset
+housing = read.csv("/Users/maktrnka/Documents/RDC_Inventory_Core_Metrics_Metro_History.csv", header = TRUE)
 head(housing, n=5)
 ```
 Yikes! let's see if we can clean this up a bit and add our time constraint.\
@@ -87,7 +93,8 @@ library(dplyr)
 library(ggplot2)
 library(ezids) # for xkabledply()
 
-housing <- postCOVID_housing_without_QF
+# Start from the same quality-flagged post-COVID data used in Questions 3 and 4.
+housing <- quality_housing
 
 # Convert dates to YYYYMM numbers.
 housing$month <- as.integer(
@@ -99,11 +106,6 @@ housing <- subset(
   month %in% c(202306, 202608) &
   !is.na(cbsa_code)
 )
-
-# Apply the existing quality-flag rule.
-if ("quality_flag" %in% names(housing)) {
-  housing <- subset(housing, quality_flag == 0)
-}
 
 # Accept either household-rank column name.
 if (!("household_rank" %in% names(housing))) {
