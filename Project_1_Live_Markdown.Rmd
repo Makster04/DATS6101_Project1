@@ -231,13 +231,26 @@ q1_pval <- summary(q1_anova)[[1]][1, 5]
 xkabledply(q1_anova, title = "Log Listing-Price Change and Metro-Size Tier ANOVA result summary")
 
 # Mean log change per tier, converted to average % change.
-q1_means <- tapply(q1$log_price_change, q1$metro_size_group, mean)
-q1_pct <- 100 * (exp(q1_means) - 1)
-round(q1_pct, 2)
+q1_pct_df <- data.frame(
+  tier = factor(names(q1_pct), levels = names(q1_pct)),
+  pct = as.numeric(q1_pct)
+)
+
+ggplot(q1_pct_df, aes(x = tier, y = pct, fill = tier)) +
+  geom_col(colour = "black", width = 0.6) +
+  geom_text(aes(label = paste0(round(pct, 2), "%"),
+                vjust = ifelse(pct >= 0, -0.5, 1.5))) +
+  geom_hline(yintercept = 0, colour = "black") +
+  scale_fill_manual(values = q1_colors) +
+  scale_y_continuous(expand = expansion(mult = 0.15)) +
+  labs(title = "Average % change in median listing price by metro-size tier post COVID",
+       x = "Metro-size tier", y = "Average % change") +
+  theme(legend.position = "none")
 
 # Check: Welch's ANOVA does not assume the tiers have equal spreads.
 q1_welch_pval <- oneway.test(log_price_change ~ metro_size_group, data = q1, var.equal = FALSE)$p.value
 q1_welch_pval
+q1_pval
 ```
 
 ### Analysis Metro-Size Tier
