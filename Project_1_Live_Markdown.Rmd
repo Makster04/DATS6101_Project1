@@ -1,5 +1,5 @@
 ---
-title: "Project 1 - Housing Data Post COVID?"
+title: "Project 1 Rearch Paper - Housing Data Post COVID?"
 author: "Mia Alecia Goins, Mak Trnka"
 date: "`r Sys.Date()`"
 output:
@@ -425,7 +425,7 @@ All expected counts are at least 5, so the chi-square test is valid. Our p-value
 Both tests assume each metro is an independent observation, and they show association, not cause and effect.\
 
 ## Question 3a
-**After COVID (from June 2023 to August 2026) is the average number of price reduction/increase share the same across different areas, across states?** \
+**After COVID (from June 2023 to August 2026) is the average number of price reduction/increase share the same across different metro areas, across states?** \
 **price_increased_share:** The percent of houses that had price increases in that metro area\
 **price_reduced_share:** The percent of houses that had price reductions in that metro area\
 
@@ -498,7 +498,7 @@ Since our P-value is `r red_rank_pval` well below our $\alpha$ (0.05) we reject 
 **Post-hoc Tukey Time for Household Rank** \ 
 ```{r tukeyHSD}
 tukeyAoVRank = TukeyHSD(anovaRank)
-tukeyAoVRank
+head(tukeyAoVRank$HouseholdRank , n=100)
 ```
 
 ```{r}
@@ -521,7 +521,7 @@ xkabledply(anovaState, title = "Price Reduction Share and State ANOVA result sum
 ```
 
 ### Analysis State
-Since our P-value is `r red_state_pval` well below our $\alpha$ (0.05) we reject our null hypothesis and have data that supports our alternative hypothesis that all average log reduction counts are not equal across all states (including DC).\
+Since our P-value is `r red_state_pval` well below our $\alpha$ (0.05) we reject our null hypothesis and have data that supports our alternative hypothesis that all average reduction shares are not equal across all states (including DC).\
 
 **Post-hoc Tukey Time for State** \
 ```{r}
@@ -537,7 +537,7 @@ passed_state_pairs = subset(tukeyStatedf, p.adj>=0.05)  # passed
 Of all the `r nrow(tukeyStatedf)` rows in the Tukey test `r nrow(problem_state_pairs)` failed or `r (nrow(problem_state_pairs)/nrow(tukeyStatedf))*100` percent of the pairs failed. While `r (nrow(passed_state_pairs)/nrow(tukeyStatedf))*100` percent passed. There was also `r nrow(subset(tukeyStatedf, p.adj==0))` zero pairs. Within these pairs multiple states are vastly different with others leading to our failed ANOVA test.
 
 ## Question 3b
-**After COVID (from June 2023 to August 2026) is the probability that a price increase will happen independent from household Rank, from states?**\
+**After COVID (from June 2023 to August 2026) is the probability that a price increase will happen independent from metro area, from state?**\
 **price_increases:** a factor which answers if that metro has had any price increases. 0 if price_reduced_share was equal to 0, 1 if it was any higher (denoting that increases did happen).\
 ```{r}
 quality_housing$price_increases = ifelse(quality_housing$price_increased_share == 0, 0, 1)
@@ -655,7 +655,7 @@ qqline(log_housing$log_list_count)
 From the box plots the variability is pretty even among all 12 months (possibly excluding months 1,2, and 12) so the test may fail.\
 
 ### Null Hypothesis Construction Total Listings
-**Null Hypothesis** $H_0: \mu_1=\mu_2=...=\mu_{11}=\mu_{12}$ average log total listing count is equal across all 12 months\
+**Null Hypothesis** $H_0: \mu_1=\mu_2=...=\mu_{11}=\mu_{12}$ average total listing count is equal across all 12 months\
 **Alternative Hypothesis** $H_1:$ The 12 mean values are NOT all equal\
 **Alpha** $\alpha=0.05$
 
@@ -667,7 +667,7 @@ xkabledply(anovaLogList, title = "log Total Listing Count and Month ANOVA result
 ```
 
 ### Analysis Total Listings
-Since our p-value is `r format(log_listing_pval , scientific = TRUE)` well below our $\alpha$ (0.05) we reject our null hypothesis and have data that supports our alternative hypothesis that the average log total listing count is not equal across all 12 months.\
+Since our p-value is `r format(log_listing_pval , scientific = TRUE)` well below our $\alpha$ (0.05) we reject our null hypothesis and have data that supports our alternative hypothesis that the average total listing count is not equal across all 12 months.\
 
 **Post-hoc Tukey Time for Total Listings**\
 ```{r}
