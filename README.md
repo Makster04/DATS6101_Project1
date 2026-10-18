@@ -4,5 +4,5 @@ Using listing prices across all metro areas from Realtor.com, which sources its 
 1. After COVID (from June 2023 to August 2026), did the average change in median listing price differ across the four metro-size tiers?
 2. After COVID (from June 2023 to August 2026), were increases in pending ratios associated with changes in median listing prices across metro areas?
 3. a: After COVID (from June 2023 to August 2026) is the average number of price reductions the same across different metro areas, across states? <br />
-   b: After COVID (from June 2023 to August 2026) is the probability that a price increase will happen independent from household Rank, from states?
+   b: After COVID (from June 2023 to August 2026) is the probability that a price increase will happen independent from metro area, from state?
 4. After COVID (from June 2023 to August 2026) does the average amount of total listings in a metro area fluctuate during the year? Is there an increase during important times (Ex. start of school/summer)??
